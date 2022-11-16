@@ -8,7 +8,7 @@ import time
 running_time = 24*365
 
 
-# Original main
+# Original main ##
 def simulate_competition():
     # my_planner = PPOPlanner(model_name = "ppo_masked_long_train_time")
     #my_planner = GreedyPlanner()
