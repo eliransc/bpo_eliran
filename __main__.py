@@ -1,10 +1,12 @@
+import pandas as pd
+
 from simulator import Simulator
 from planners import GreedyPlanner
 from planners import planner_Eliran
 from planners2 import PPOPlanner
 import pickle5 as pkl
 import time
-
+import os
 running_time = 24*365
 
 
@@ -17,9 +19,11 @@ def simulate_competition():
     #my_planner = NoPlanner()
     my_planner = planner_Eliran()
 
-    now = time.time()
+
+
     results = []
-    for i in range(1):
+    for i in range(2):
+        now = time.time()
         simulator = Simulator(running_time = running_time, planner = my_planner, instance_file="BPI Challenge 2017 - instance.pickle")
 
         if type(my_planner) == PPOPlanner:
@@ -29,10 +33,22 @@ def simulate_competition():
         result = simulator.run()
         #print(f'Simulation finished in {time()-t1} seconds')
         print(result)
+        if os.path.exists('df_results.pkl'):
+            df = pkl.load(open('df_results.pkl', 'rb'))
+        else:
+            df = pd.DataFrame([])
+
+
+        curr_ind = df.shape[0]
+
+
         results.append(result)
         run_time = time.time() - now
-        pkl.dump((run_time, result), open('result1.pkl', 'wb'))
-        print(run_time)
+        df.loc[curr_ind, 'instance'] = 1
+        df.loc[curr_ind, 'runtime'] = run_time
+        df.loc[curr_ind, 'avg_cycle'] = result
+        pkl.dump(df, open('df_results.pkl', 'wb'))
+        print(df)
 
 #    with open("results.txt", "rw") as out_file:
 #        for i in results:
