@@ -22,7 +22,7 @@ def simulate_competition():
 
 
     results = []
-    for i in range(2):
+    for i in range(3):
         now = time.time()
         simulator = Simulator(running_time = running_time, planner = my_planner, instance_file="BPI Challenge 2017 - instance 2.pickle")
 
