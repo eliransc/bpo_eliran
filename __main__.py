@@ -55,7 +55,7 @@ def simulate_competition():
         df.loc[curr_ind, 'avg_cycle'] = result
 
 
-        pkl.dump(df, open('df_results.pkl', 'wb'))
+        pkl.dump(df, open('df_results1.pkl', 'wb'))
         print(df)
 
 #    with open("results.txt", "rw") as out_file:
