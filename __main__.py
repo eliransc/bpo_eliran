@@ -24,7 +24,7 @@ def simulate_competition():
     results = []
     for i in range(2):
         now = time.time()
-        simulator = Simulator(running_time = running_time, planner = my_planner, instance_file="BPI Challenge 2017 - instance.pickle")
+        simulator = Simulator(running_time = running_time, planner = my_planner, instance_file="BPI Challenge 2017 - instance 2.pickle")
 
         if type(my_planner) == PPOPlanner:
             my_planner.linkSimulator(simulator)
@@ -44,7 +44,7 @@ def simulate_competition():
 
         results.append(result)
         run_time = time.time() - now
-        df.loc[curr_ind, 'instance'] = 1
+        df.loc[curr_ind, 'instance'] = 2
         df.loc[curr_ind, 'runtime'] = run_time
         df.loc[curr_ind, 'avg_cycle'] = result
         pkl.dump(df, open('df_results.pkl', 'wb'))
