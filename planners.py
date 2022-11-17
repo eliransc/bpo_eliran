@@ -13,11 +13,11 @@ class planner_Eliran:
     def __init__(self):
 
         self.case_num = np.random.randint(1,10000000)
-        self.a1 = 10.879914
-        self.a2 = 0.475911
-        self.a3 = 1.456346
-        self.a4 = 0.928605
-        self.a5 = 8.479268
+        self.a1 = np.random.uniform(0,12)
+        self.a2 = np.random.uniform(0,12)
+        self.a3 = np.random.uniform(0,12)
+        self.a4 = np.random.uniform(0,12)
+        self.a5 = np.random.uniform(0,12)
         self.df_mean_var = pd.DataFrame(columns=['resource'])
 
         all_cols = ['task', 'W_Complete application', 'W_Call after offers',

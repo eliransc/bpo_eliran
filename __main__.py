@@ -33,8 +33,8 @@ def simulate_competition():
         result = simulator.run()
         #print(f'Simulation finished in {time()-t1} seconds')
         print(result)
-        if os.path.exists('df_results.pkl'):
-            df = pkl.load(open('df_results.pkl', 'rb'))
+        if os.path.exists('df_results1.pkl'):
+            df = pkl.load(open('df_results1.pkl', 'rb'))
         else:
             df = pd.DataFrame([])
 
@@ -44,9 +44,17 @@ def simulate_competition():
 
         results.append(result)
         run_time = time.time() - now
+        df.loc[curr_ind, 'a1'] = my_planner.a1
+        df.loc[curr_ind, 'a2'] = my_planner.a2
+        df.loc[curr_ind, 'a3'] = my_planner.a3
+        df.loc[curr_ind, 'a4'] = my_planner.a4
+        df.loc[curr_ind, 'a5'] = my_planner.a5
+
         df.loc[curr_ind, 'instance'] = 2
         df.loc[curr_ind, 'runtime'] = run_time
         df.loc[curr_ind, 'avg_cycle'] = result
+
+
         pkl.dump(df, open('df_results.pkl', 'wb'))
         print(df)
 
