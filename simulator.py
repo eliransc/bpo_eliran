@@ -1,10 +1,11 @@
 from enum import Enum, auto
 from datetime import datetime, timedelta
-import numpy as np
 import random
 import pickle5 as pickle
 from abc import ABC, abstractmethod
-#from types import NoneType
+
+
+RUNNING_TIME = 24*365
 
 
 class Event:
@@ -247,7 +248,6 @@ class EventType(Enum):
     TASK_PLANNED = auto()
     COMPLETE_CASE = auto()
     SCHEDULE_RESOURCES = auto()
-    RETURN_REWARD = auto()
 
 
 class TimeUnit(Enum):
@@ -274,10 +274,8 @@ class SimulationEvent:
 
 
 class Simulator:
-    def __init__(self, running_time, report=False, instance_file="BPI Challenge 2017 - instance.pickle", planner=None):
-        self.report = report
+    def __init__(self, planner, instance_file="BPI Challenge 2017 - instance.pickle"):
         self.events = []
-        self.planner = planner
 
         self.unassigned_tasks = dict()
         self.assigned_tasks = dict()
@@ -293,57 +291,21 @@ class Simulator:
         self.total_cycle_time = 0
         self.case_start_times = dict()
 
+        self.planner = planner
         self.problem = MinedProblem.from_file(instance_file)
-        self.problem_resource_pool = self.problem.resource_pools        
+        self.problem_resource_pool = self.problem.resource_pools
 
-        # parameters for task generation
-        self.next_case_id = 0
-        self.next_task_id = 0
-        self.unfinished_tasks = []
+        #Added variables
+        self.last_assignment_duration = 0
+        self.last_assignment_time = 0
 
-        # parameters for task generation
-        self.next_case_id = 0
-        self.next_task_id = 0
-        self.unfinished_tasks = []
-
-        # new parameters
-        self.running_time = running_time
-        self.status = "RUNNING"
-        self.count_rewards = 0
-        self.return_reward = False
-        self.plan = False
-        self.average_cycle_time = None
-        self.previous_average_cycle_time = None #used to split the rewards daily
-        self.previous_finalized_cases = 0
-        self.resources_scheduled = False
-        self.last_assignment_time = 0 # used to track the moment of the last assignment
-        self.last_assignment_duration = 0 # used to track the duration since the last assignment
-        self.current_reward = 0
-
-        self.reward_task = 1
-        self.reward_case = 10
-        self.reward_penalty = 0
-
-        # parameters needed for masking
-        self.task_types = sorted(list(self.problem_resource_pool.keys())) #all task types (should be 7 elements)
-        self.resources = sorted(list(set(np.hstack(list(self.problem_resource_pool.values()))))) #all the resources in the problem (should be 145 elements)
-
-        self.input = self.resources + self.resources + self.resources + self.task_types
-    
-        self.resource_pools_indexes = {}
-        self.output = []
-        for task, value in self.problem_resource_pool.items():
-            indexes = []
-            for resource in value:
-                indexes.append(self.resources.index(resource)) # Finds and appends the index of a resource
-                self.output.append((task, resource))
-        
-            self.resource_pools_indexes[task] = indexes # Dict with task as key. Values are the index of the resources in the input vector
-        else:
-            self.output.append('postpone') # Add postpone action
+        self.task_arrivals = {task_type:0 for task_type in self.problem_resource_pool.keys()}
+        self.task_departures = {task_type:0 for task_type in self.problem_resource_pool.keys()}
+        self.case_arrivals = 0
+        self.case_departures = 0
+        self.print_timer = 1
 
         self.init_simulation()
-            
 
     def init_simulation(self):
         # set all resources to available
@@ -351,13 +313,13 @@ class Simulator:
             self.available_resources.add(r)
 
         # generate resource scheduling event to start the schedule
-        self.events.append((self.now, SimulationEvent(EventType.SCHEDULE_RESOURCES, self.now, None)))
+        self.events.append((0, SimulationEvent(EventType.SCHEDULE_RESOURCES, 0, None)))
 
         # reset the problem
         self.problem.restart()
 
         # generate arrival event for the first task of the first case
-        (t, task) = self.generate_case()
+        (t, task) = self.problem.next_case()
         self.events.append((t, SimulationEvent(EventType.CASE_ARRIVAL, t, task)))
 
     def desired_nr_resources(self):
@@ -366,51 +328,41 @@ class Simulator:
     def working_nr_resources(self):
         return len(self.available_resources) + len(self.busy_resources) + len(self.reserved_resources)
 
-    def generate_case(self):
-        t = self.now + self.problem.interarrival_time_sample()
-        initial_task_type = self.problem.sample_initial_task_type()
-        task = Task(self.next_task_id, self.next_case_id, initial_task_type)
-        self.problem.cases[task.case_id]
-        self.next_task_id += 1
-        self.next_case_id += 1
-        return (t, task)
-
-    def generate_next_tasks(self, task):
-        for tt in self.problem.next_task_types_sample(task):
-            new_task = Task(self.next_task_id, task.case_id, tt)    
-            self.unassigned_tasks[new_task.id] = new_task
-            self.busy_cases[task.case_id].append(new_task.id)
-            self.next_task_id += 1
-
     def run(self):
         # repeat until the end of the simulation time:
-        while self.now <= self.running_time:
+        while self.now <= RUNNING_TIME:
+            if self.now / self.print_timer > 500:
+                print(self.now, '/', RUNNING_TIME)
+                self.print_timer += 1
+                
             # get the first event e from the events
             event = self.events.pop(0)
             # t = time of e
             self.now = event[0]
             event = event[1]
-            #print(event.event_type)
+
             # if e is an arrival event:
             if event.event_type == EventType.CASE_ARRIVAL:
+                self.case_arrivals += 1
                 self.case_start_times[event.task.case_id] = self.now
-                if self.report: print(Event(event.task.case_id, None, self.now, None, EventType.CASE_ARRIVAL))
+                self.planner.report(Event(event.task.case_id, None, self.now, None, EventType.CASE_ARRIVAL))
                 # add new task
-                if self.report: print(Event(event.task.case_id, event.task, self.now, None, EventType.TASK_ACTIVATE))
+                self.planner.report(Event(event.task.case_id, event.task, self.now, None, EventType.TASK_ACTIVATE))
                 self.unassigned_tasks[event.task.id] = event.task
                 self.busy_cases[event.task.case_id] = [event.task.id]
                 # generate a new planning event to start planning now for the new task
                 self.events.append((self.now, SimulationEvent(EventType.PLAN_TASKS, self.now, None, nr_tasks=len(self.unassigned_tasks), nr_resources=len(self.available_resources))))
                 # generate a new arrival event for the first task of the next case
-                (t, task) = self.generate_case()
+                (t, task) = self.problem.next_case()
                 self.events.append((t, SimulationEvent(EventType.CASE_ARRIVAL, t, task)))
                 self.events.sort()
 
             # if e is a start event:
             elif event.event_type == EventType.START_TASK:
-                if self.report: print(Event(event.task.case_id, event.task, self.now, event.resource, EventType.START_TASK))
+                self.task_arrivals[event.task.task_type] += 1
+                self.planner.report(Event(event.task.case_id, event.task, self.now, event.resource, EventType.START_TASK))
                 # create a complete event for task
-                t = self.now + self.problem.processing_time_sample(event.resource, event.task)
+                t = self.now + self.problem.processing_time(event.task, event.resource)
                 self.events.append((t, SimulationEvent(EventType.COMPLETE_TASK, t, event.task, event.resource)))
                 self.events.sort()
                 # set resource to busy
@@ -419,7 +371,8 @@ class Simulator:
 
             # if e is a complete event:
             elif event.event_type == EventType.COMPLETE_TASK:
-                if self.report: print(Event(event.task.case_id, event.task, self.now, event.resource, EventType.COMPLETE_TASK))
+                self.task_departures[event.task.task_type] += 1
+                self.planner.report(Event(event.task.case_id, event.task, self.now, event.resource, EventType.COMPLETE_TASK))
                 # set resource to available, if it is still desired, otherwise set it to away
                 del self.busy_resources[event.resource]
                 if self.working_nr_resources() <= self.desired_nr_resources():
@@ -430,16 +383,17 @@ class Simulator:
                 # remove task from assigned tasks
                 del self.assigned_tasks[event.task.id]
                 self.busy_cases[event.task.case_id].remove(event.task.id)
-                self.generate_next_tasks(event.task)
-                
+                # generate unassigned tasks for each next task
+                for next_task in self.problem.next_tasks(event.task):
+                    self.planner.report(Event(event.task.case_id, next_task, self.now, None, EventType.TASK_ACTIVATE))
+                    self.unassigned_tasks[next_task.id] = next_task
+                    self.busy_cases[event.task.case_id].append(next_task.id)
                 if len(self.busy_cases[event.task.case_id]) == 0:
-                    if self.report: self.planner.report(Event(event.task.case_id, None, self.now, None, EventType.COMPLETE_CASE))
+                    self.planner.report(Event(event.task.case_id, None, self.now, None, EventType.COMPLETE_CASE))
                     self.events.append((self.now, SimulationEvent(EventType.COMPLETE_CASE, self.now, event.task)))
                 # generate a new planning event to start planning now for the newly available resource and next tasks
                 self.events.append((self.now, SimulationEvent(EventType.PLAN_TASKS, self.now, None, nr_tasks=len(self.unassigned_tasks), nr_resources=len(self.available_resources))))
                 self.events.sort()
-
-                self.current_reward += self.reward_task
 
             # if e is a schedule resources event: move resources between available/away,
             # depending to how many resources should be available according to the schedule.
@@ -480,88 +434,50 @@ class Simulator:
 
             # if e is a planning event: do assignment
             elif event.event_type == EventType.PLAN_TASKS:
-                
-                if self.planner == None: #in training mode, we do not provide a planner
-                    # there only is an assignment if there are free resources and tasks
-                    if len(self.unassigned_tasks) > 0 and len(self.available_resources) > 0:
-                        self.plan = True
-                        break # Return to gym environment
-                else: #at inference time, we call the plan function of the planner
-                    assignments = self.planner.plan(self.available_resources.copy(), list(self.unassigned_tasks.values()), self.problem_resource_pool)
-                    #print(assignments)
-                    self.schedule_resources(assignments)
+                # there only is an assignment if there are free resources and tasks
+                if len(self.unassigned_tasks) > 0 and len(self.available_resources) > 0:
+                    moment = self.now
+                    self.last_assignment_duration = moment - self.last_assignment_time
+                    self.last_assignment_time = moment
+
+                    assignments = self.planner.plan(self.available_resources.copy(), list(self.unassigned_tasks.values()), self.problem_resource_pool, self.last_assignment_duration) #TODO: substitute this with the model's answer
+                    # for each newly assigned task:
+
+                    for (task, resource) in assignments:
+                        if task not in self.unassigned_tasks.values():
+                            return None, "ERROR: trying to assign a task that is not in the unassigned_tasks."
+                        if resource not in self.available_resources:
+                            return None, "ERROR: trying to assign a resource that is not in available_resources."
+                        if resource not in self.problem_resource_pool[task.task_type]:
+                            return None, "ERROR: trying to assign a resource to a task that is not in its resource pool."
+                        # create start event for task
+                        self.events.append((moment, SimulationEvent(EventType.START_TASK, moment, task, resource)))
+                        # assign task
+                        del self.unassigned_tasks[task.id]
+                        self.assigned_tasks[task.id] = (task, resource, moment)
+                        # reserve resource
+                        self.available_resources.remove(resource)
+                        self.reserved_resources[resource] = (event.task, moment)
+                    self.events.sort()
 
             # if e is a complete case event: add to the number of completed cases
             elif event.event_type == EventType.COMPLETE_CASE:
+                self.case_departures += 1
                 self.total_cycle_time += self.now - self.case_start_times[event.task.case_id]
                 self.finalized_cases += 1
-                # Reward function
-                self.current_reward += self.reward_case
 
-        if self.now > self.running_time:
-            self.status = "FINISHED"
-            unfinished_cases = 0
-            for busy_tasks in self.busy_cases.values():
-                if len(busy_tasks) > 0:
-                    if busy_tasks[0] in self.unassigned_tasks:
-                        busy_case_id = self.unassigned_tasks[busy_tasks[0]].case_id
-                    else:
-                        busy_case_id = self.assigned_tasks[busy_tasks[0]][0].case_id
-                    if busy_case_id in self.case_start_times:
-                        start_time = self.case_start_times[busy_case_id]
-                        if start_time <= self.running_time:
-                            self.total_cycle_time += self.running_time - start_time
-                            self.finalized_cases += 1
-                            unfinished_cases += 1
+        unfinished_cases = 0
+        for busy_tasks in self.busy_cases.values():
+            if len(busy_tasks) > 0:
+                if busy_tasks[0] in self.unassigned_tasks:
+                    busy_case_id = self.unassigned_tasks[busy_tasks[0]].case_id
+                else:
+                    busy_case_id = self.assigned_tasks[busy_tasks[0]][0].case_id
+                if busy_case_id in self.case_start_times:
+                    start_time = self.case_start_times[busy_case_id]
+                    if start_time <= RUNNING_TIME:
+                        self.total_cycle_time += RUNNING_TIME - start_time
+                        self.finalized_cases += 1
+                        unfinished_cases += 1
 
-            self.current_reward += self.reward_penalty * unfinished_cases
-            print(f'Reward at end {self.current_reward}. Unfinished cases: {unfinished_cases}, completed cases: {self.finalized_cases-unfinished_cases}')
-
-            # self.average_cycle_time = (self.total_cycle_time - self.previous_total_cycle_time)/(self.finalized_cases - self.previous_finalized_cases)
-            # self.current_reward = 1/self.average_cycle_time
-            
-            print(self.total_cycle_time / self.finalized_cases, "COMPLETED: you completed a full year of simulated customer cases.")
-            return self.total_cycle_time / self.finalized_cases
-    def schedule_resources(self, assignments):          
-        if self.planner == None:
-            assignments = [((next((x for x in list(self.unassigned_tasks.values()) if x.task_type == task), None)), resource) for (task, resource) in assignments]
-        # for each newly assigned task:
-        moment = self.now
-        self.last_assignment_duration = moment - self.last_assignment_time
-        self.last_assignment_time = moment
-
-        # for each newly assigned task:
-        moment = self.now
-        for (task, resource) in assignments:
-            if task not in self.unassigned_tasks.values():
-                return None, "ERROR: trying to assign a task that is not in the unassigned_tasks."
-            if resource not in self.available_resources:
-                return None, "ERROR: trying to assign a resource that is not in available_resources."
-            if resource not in self.problem_resource_pool[task.task_type]:
-                return None, "ERROR: trying to assign a resource to a task that is not in its resource pool."
-            # create start event for task
-            self.events.append((moment, SimulationEvent(EventType.START_TASK, moment, task, resource)))
-            # assign task
-            del self.unassigned_tasks[task.id]
-            self.assigned_tasks[task.id] = (task, resource, moment)
-            # reserve resource
-            self.available_resources.remove(resource)
-            self.reserved_resources[resource] = (task, moment)
-        self.events.sort()
-
-    def get_state(self):
-        
-        #av_resources_ones = list(np.where(np.isin(np.asarray(self.resources), self.available_resources), 1, 0))
-        av_resources_ones = [1 if x in self.available_resources else 0 for x in self.resources]
-        
-        #get current time in task for each resource (x[1] is the processing start time)
-        busy_resources_times = [self.now - self.busy_resources[x][1] if x in self.busy_resources else 0 for x in self.resources]
-        
-        #get current task type for each busy resource
-        busy_resources_tasks = [self.task_types.index(self.busy_resources[x][0].task_type) + 1 if x in self.busy_resources else 0 for x in self.resources]
-
-        #task_types_num = [np.count_nonzero(el in [o.task_type for o in self.unassigned_tasks.values()]) for el in self.task_types]
-        task_types_num =  [np.sum(el in [o.task_type for o in self.unassigned_tasks.values()]) for el in self.task_types]
-
-
-        return av_resources_ones + busy_resources_times + busy_resources_tasks + task_types_num
+        return self.total_cycle_time / self.finalized_cases, "COMPLETED: you completed a full year of simulated customer cases."
