@@ -13,8 +13,8 @@ running_time = 24*365
 # Original main ##
 def simulate_competition():
     # my_planner = PPOPlanner(model_name = "ppo_masked_long_train_time")
-    #my_planner = GreedyPlanner()
-    #my_planner = RealGreedyPlanner()
+    # my_planner = GreedyPlanner()
+    # my_planner = RealGreedyPlanner()
     #my_planner = LPPlanner()
     #my_planner = NoPlanner()
     my_planner = planner_Eliran()
@@ -24,7 +24,7 @@ def simulate_competition():
     results = []
     for i in range(3):
         now = time.time()
-        simulator = Simulator(running_time = running_time, planner = my_planner, instance_file="BPI Challenge 2017 - instance 2.pickle")
+        simulator = Simulator( planner = my_planner, instance_file="BPI Challenge 2017 - instance 2.pickle")
 
         if type(my_planner) == PPOPlanner:
             my_planner.linkSimulator(simulator)
