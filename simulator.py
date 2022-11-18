@@ -440,7 +440,7 @@ class Simulator:
                     self.last_assignment_duration = moment - self.last_assignment_time
                     self.last_assignment_time = moment
 
-                    assignments = self.planner.plan(self.available_resources.copy(), list(self.unassigned_tasks.values()), self.problem_resource_pool, self.last_assignment_duration) #TODO: substitute this with the model's answer
+                    assignments = self.planner.plan(self.available_resources.copy(), list(self.unassigned_tasks.values()), self.problem_resource_pool) #TODO: substitute this with the model's answer
                     # for each newly assigned task:
 
                     for (task, resource) in assignments:

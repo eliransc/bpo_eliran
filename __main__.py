@@ -30,7 +30,7 @@ def simulate_competition():
             my_planner.linkSimulator(simulator)
     
         #t1 = time()
-        result = simulator.run()
+        result = simulator.run()[0]
         #print(f'Simulation finished in {time()-t1} seconds')
         print(result)
         if os.path.exists('df_results1.pkl'):
