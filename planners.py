@@ -316,8 +316,9 @@ class planner_Eliran:
 
 
             elif str(event.lifecycle_state) == 'EventType.COMPLETE_CASE':
-                prev_task = self.df.loc[self.df.index[-2], 'task']
-                self.df_freq_transition.loc[self.df_freq_transition['task']==prev_task,'complete_case'] = self.df_freq_transition.loc[self.df_freq_transition['task']==prev_task,'complete_case'].item() + 1
+                if self.df.shape[0]>1:
+                    prev_task = self.df.loc[self.df.index[-2], 'task']
+                    self.df_freq_transition.loc[self.df_freq_transition['task']==prev_task,'complete_case'] = self.df_freq_transition.loc[self.df_freq_transition['task']==prev_task,'complete_case'].item() + 1
 
 
 
