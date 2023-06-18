@@ -4,28 +4,34 @@ from simulator import Simulator
 from planners import GreedyPlanner
 from planners import planner_Eliran
 from planners2 import PPOPlanner
-import pickle5 as pkl
+import pickle as pkl
 import time
 import os
-running_time = 24*365
-
+running_time = 24*30
+import numpy as np
 
 # Original main ##
-def simulate_competition():
+def simulate_competition(a1,a2,a3,a4,a5):
     # my_planner = PPOPlanner(model_name = "ppo_masked_long_train_time")
     # my_planner = GreedyPlanner()
     # my_planner = RealGreedyPlanner()
     #my_planner = LPPlanner()
     #my_planner = NoPlanner()
-    my_planner = planner_Eliran()
 
+    # 10.879914, 0.475911, 1.456346, 0.928605, 8.479268
+    # a1 = A[0]
+    # a2 = A[1]
+    # a3 = A[2]
+    # a4 = A[3]
+    # a5 = A[4]
+
+    my_planner = planner_Eliran(a1, a2, a3, a4, a5)
 
 
     results = []
-    for i in range(3):
+    for i in range(20):
         now = time.time()
-        simulator = Simulator(  planner = my_planner, instance_file="BPI Challenge 2017 - instance.pickle") # running_time = running_time,
-
+        simulator = Simulator(planner = my_planner, instance_file="BPI Challenge 2017 - instance.pickle") # running_time = running_time,
         if type(my_planner) == PPOPlanner:
             my_planner.linkSimulator(simulator)
     
@@ -33,8 +39,8 @@ def simulate_competition():
         result = simulator.run()[0]
         #print(f'Simulation finished in {time()-t1} seconds')
         print(result)
-        if os.path.exists('df_results1.pkl'):
-            df = pkl.load(open('df_results1.pkl', 'rb'))
+        if os.path.exists('df_results5.pkl'):
+            df = pkl.load(open('df_results5.pkl', 'rb'))
         else:
             df = pd.DataFrame([])
 
@@ -54,9 +60,10 @@ def simulate_competition():
         df.loc[curr_ind, 'runtime'] = run_time
         df.loc[curr_ind, 'avg_cycle'] = result
 
-
-        pkl.dump(df, open('df_results1.pkl', 'wb'))
+        pkl.dump(df, open('df_results5.pkl', 'wb'))
         print(df)
+    return  -np.array(results).mean()
+
 
 #    with open("results.txt", "rw") as out_file:
 #        for i in results:
@@ -70,7 +77,13 @@ def simulate_competition():
     
 
 def main():
-    simulate_competition()
+
+
+
+    A = [10.879914, 0.475911, 1.456346, 0.928605, 8.479268]
+
+    results = simulate_competition(10.531437856645526, 15.375280086388253, 7.264139715351323, 5.781553323925149, 19.416205458185715)
+    pkl.dump(results, open('res.pkl', 'wb'))
 
 if __name__ == "__main__":
     main()

@@ -1,11 +1,11 @@
 from enum import Enum, auto
 from datetime import datetime, timedelta
 import random
-import pickle5 as pickle
+import pickle as pickle
 from abc import ABC, abstractmethod
 
 
-RUNNING_TIME = 24*365
+RUNNING_TIME = 24*30
 
 
 class Event:
@@ -332,7 +332,7 @@ class Simulator:
 
     def generate_next_tasks(self, task):
         for tt in self.problem.next_task_types_sample(task):
-            new_task = Task(self.next_task_id, task.case_id, tt)    
+            new_task = Task(self.next_task_id, task.case_id, tt)
             self.unassigned_tasks[new_task.id] = new_task
             self.busy_cases[task.case_id].append(new_task.id)
             self.next_task_id += 1
@@ -340,6 +340,7 @@ class Simulator:
     def run(self):
         # repeat until the end of the simulation time:
         while self.now <= RUNNING_TIME:
+
             # get the first event e from the events
             event = self.events.pop(0)
             # t = time of e

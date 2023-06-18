@@ -7,32 +7,77 @@ import pandas as pd
 from itertools import permutations, combinations
 import time
 from simulator import Simulator
+import pickle as pkl
 
 class planner_Eliran:
 
-    def __init__(self):
+    def __init__(self, a1, a2, a3, a4, a5):
+
+        bpi = pkl.load(open('BPI Challenge 2017 - instance.pickle', 'rb'))
+
+
 
         self.case_num = np.random.randint(1,10000000)
-        self.a1 = 10.879914
-        self.a2 = 0.475911
-        self.a3 = 1.456346
-        self.a4 = 0.928605
-        self.a5 = 8.479268
-        self.df_mean_var = pd.DataFrame(columns=['resource'])
+        self.a1 = a1
+        self.a2 = a2
+        self.a3 = a3
+        self.a4 = a4
+        self.a5 = a5
 
         all_cols = ['task', 'W_Complete application', 'W_Call after offers',
                     'W_Validate application', 'W_Call incomplete files',
                     'W_Handle leads', 'W_Assess potential fraud',
                     'W_Shortened completion', 'complete_case']
+
+        possible_tasks = ['W_Complete application', 'W_Call after offers',
+                          'W_Validate application', 'W_Call incomplete files',
+                          'W_Handle leads', 'W_Assess potential fraud',
+                          'W_Shortened completion']
+
+        ## Creating the dataframe
+
         num_cols = len(all_cols)
         initial_df_vals = np.zeros((num_cols - 2, num_cols))
         self.df_freq_transition = pd.DataFrame(initial_df_vals, columns=all_cols)
 
-        for task_ind, task_ in enumerate(all_cols):
-            if (task_ind > 0) and (task_ind < num_cols - 1):
-                self.df_freq_transition.loc[task_ind - 1, 'task'] = task_
+        for task_ind, task_ in enumerate(possible_tasks):
+            self.df_freq_transition.loc[task_ind, 'task'] = task_
 
-        self.df = pd.DataFrame([])
+        ## Updating the prob in each cell
+
+        for task_row in possible_tasks:
+
+            for task_col in possible_tasks:
+                # if possible_next(task_row, task_col):
+
+                self.df_freq_transition.loc[self.df_freq_transition['task'] == task_row, task_col] = self.give_next_prob(bpi, task_row,
+                                                                                                          task_col)
+
+        # updating the completion prob
+        for task in possible_tasks:
+            self.df_freq_transition.loc[self.df_freq_transition['task'] == task, 'complete_case'] = 1 - np.array(
+                self.df_freq_transition.loc[self.df_freq_transition['task'] == task, possible_tasks]).sum()
+
+        self.df_mean_var = pd.DataFrame([])
+
+        for res_ind, res in enumerate(bpi.resources):
+            self.df_mean_var.loc[res_ind, 'resource'] = res
+            for task in bpi.task_types:
+                if res in bpi.resource_pools[task]:
+                    self.df_mean_var.loc[res_ind, 'mean_' + task] = bpi.processing_time_distribution[(task, res)][0]
+                    self.df_mean_var.loc[res_ind, 'var_' + task] = self.df_mean_var.loc[res_ind, 'mean_' + task] ** 2
+
+
+
+    def give_next_prob(self, bpi, task_row, task_col):
+
+        prob = 0
+        for ind in range(len(bpi.next_task_distribution[task_row])):
+            if task_col == bpi.next_task_distribution[task_row][ind][1]:
+                prob = bpi.next_task_distribution[task_row][ind][0]
+                return prob
+        return prob
+
 
 
     def check_if_there_is_possible_match(self, available_resources, unassigned_tasks, resource_pool):
@@ -109,16 +154,90 @@ class planner_Eliran:
         a5 = self.a5
 
 
-        if self.df.shape[0]>0:
-            curr_df_status = self.df.index[-1]
-        else:
-            curr_df_status = 0
+        # if self.df.shape[0]>0:
+        #     curr_df_status = self.df.index[-1]
+        # else:
+        #     curr_df_status = 0
 
 
 
         assignments = []
         # assign the first unassigned task to the first available resource, the second task to the second resource, etc.
 
+        #
+        # unassigned_tasks_ = [task.task_type for task in unassigned_tasks]
+        #
+        # dict_ranking_tasks = {}
+        # for resource in available_resources:
+        #     dict_ranking_tasks[resource] = self.give_resource_ranking(self.df_mean_var, resource, set(unassigned_tasks_))
+        #
+        # dict_ranking_resource = {}
+        #
+        # for task in set(unassigned_tasks_):
+        #     dict_ranking_resource[task] = self.give_task_ranking(self.df_mean_var, available_resources, task)
+        #
+        #
+        # df_combs_score = pd.DataFrame([])
+        #
+        # for task in set(unassigned_tasks_):
+        #     for resource in available_resources:
+        #         if resource in resource_pool[task]:
+        #             mean_val = self.df_mean_var.loc[
+        #                 self.df_mean_var['resource'] == resource, 'mean_' + task].item()
+        #             var_val = self.df_mean_var.loc[
+        #                 self.df_mean_var['resource'] == resource, 'var_' + task].item()
+        #
+        #             # mean_val = -1
+        #             # var_val = -1
+        #             # if self.df_mean_var.shape[0] > 0:
+        #             #     if 'mean_' + task in self.df_mean_var.columns:
+        #             #         if self.df_mean_var.loc[self.df_mean_var['resource'] == resource, 'mean_' + task].shape[
+        #             #             0] > 0:
+        #             #             if self.df_mean_var.loc[
+        #             #                 self.df_mean_var['resource'] == resource, 'mean_' + task].item() > 0:
+        #             #                 mean_val = self.df_mean_var.loc[
+        #             #                     self.df_mean_var['resource'] == resource, 'mean_' + task].item()
+        #             #                 var_val = self.df_mean_var.loc[
+        #             #                     self.df_mean_var['resource'] == resource, 'var_' + task].item()
+        #
+        #             curr_df = dict_ranking_resource[task]
+        #             res_rank = -1
+        #             if not curr_df is None:
+        #                 if not (curr_df == None).all()[0]:
+        #                     if curr_df.loc[curr_df['resource'] == resource, 'Ranking'].shape[0] > 0:
+        #                         res_rank = curr_df.loc[curr_df['resource'] == resource, 'Ranking'].item()
+        #
+        #             curr_df = dict_ranking_tasks[resource]
+        #             task_rank = -1
+        #             if not curr_df is None:
+        #                 if not (curr_df == None).all()[0]:
+        #                     if curr_df.loc[curr_df['task_name'] == task, 'Ranking'].shape[0]:
+        #                         task_rank = curr_df.loc[curr_df['task_name'] == task, 'Ranking'].item()
+        #
+        #
+        #             prob = self.df_freq_transition.loc[self.df_freq_transition['task']==task, 'complete_case'].item() # self.get_task_out_prob(self.df_freq_transition, task)
+        #
+        #             # if self.df_freq_transition.shape[0]>0:
+        #             #
+        #             #     prob = self.get_task_out_prob(self.df_freq_transition, task)
+        #             #     if not prob >= 0:
+        #             #         prob = -1
+        #             # else:
+        #             #     prob = -1
+        #
+        #
+        #             curr_ind = df_combs_score.shape[0]
+        #             df_combs_score.loc[curr_ind, 'resource'] = resource
+        #             df_combs_score.loc[curr_ind, 'task'] = task
+        #             df_combs_score.loc[curr_ind, 'mean_val'] = mean_val
+        #             df_combs_score.loc[curr_ind, 'var_val'] = var_val
+        #             df_combs_score.loc[curr_ind, 'res_rank'] = res_rank
+        #             df_combs_score.loc[curr_ind, 'task_rank'] = task_rank
+        #             df_combs_score.loc[curr_ind, 'prob'] = prob
+        #             df_combs_score.loc[curr_ind, 'tot_score'] = a1*mean_val*+a2*var_val+a3*res_rank+a4*task_rank-a5*prob
+        #
+        #
+
 
         unassigned_tasks_ = [task.task_type for task in unassigned_tasks]
 
@@ -132,24 +251,29 @@ class planner_Eliran:
             dict_ranking_resource[task] = self.give_task_ranking(self.df_mean_var, available_resources, task)
 
 
-        df_combs_score = pd.DataFrame([])
+        # df_sched_score = pd.DataFrame([])
 
         for task in set(unassigned_tasks_):
+            df_sched_score = pd.DataFrame([])
             for resource in available_resources:
                 if resource in resource_pool[task]:
 
-                    mean_val = -1
-                    var_val = -1
-                    if self.df_mean_var.shape[0] > 0:
-                        if 'mean_' + task in self.df_mean_var.columns:
-                            if self.df_mean_var.loc[self.df_mean_var['resource'] == resource, 'mean_' + task].shape[
-                                0] > 0:
-                                if self.df_mean_var.loc[
-                                    self.df_mean_var['resource'] == resource, 'mean_' + task].item() > 0:
-                                    mean_val = self.df_mean_var.loc[
-                                        self.df_mean_var['resource'] == resource, 'mean_' + task].item()
-                                    var_val = self.df_mean_var.loc[
-                                        self.df_mean_var['resource'] == resource, 'var_' + task].item()
+                    mean_val = self.df_mean_var.loc[
+                        self.df_mean_var['resource'] == resource, 'mean_' + task].item()
+                    var_val = self.df_mean_var.loc[
+                        self.df_mean_var['resource'] == resource, 'var_' + task].item()
+
+                    # mean_val = -1
+                    # var_val = -1
+                    # if self.df_mean_var.shape[0] > 0:
+                    #     if 'mean_' + task in self.df_mean_var.columns:
+                    #         if self.df_mean_var.loc[self.df_mean_var['resource'] == resource, 'mean_' + task].shape[0] > 0:
+                    #             if self.df_mean_var.loc[
+                    #                 self.df_mean_var['resource'] == resource, 'mean_' + task].item() > 0:
+                    #                 mean_val = self.df_mean_var.loc[
+                    #                     self.df_mean_var['resource'] == resource, 'mean_' + task].item()
+                    #                 var_val = self.df_mean_var.loc[
+                    #                     self.df_mean_var['resource'] == resource, 'var_' + task].item()
 
                     curr_df = dict_ranking_resource[task]
                     res_rank = -1
@@ -165,82 +289,13 @@ class planner_Eliran:
                             if curr_df.loc[curr_df['task_name'] == task, 'Ranking'].shape[0]:
                                 task_rank = curr_df.loc[curr_df['task_name'] == task, 'Ranking'].item()
 
-
-
-                    if self.df_freq_transition.shape[0]>0:
-
-                        prob = self.get_task_out_prob(self.df_freq_transition, task)
-                        if not prob >= 0:
-                            prob = -1
-                    else:
-                        prob = -1
-
-
-                    curr_ind = df_combs_score.shape[0]
-                    df_combs_score.loc[curr_ind, 'resource'] = resource
-                    df_combs_score.loc[curr_ind, 'task'] = task
-                    df_combs_score.loc[curr_ind, 'mean_val'] = mean_val
-                    df_combs_score.loc[curr_ind, 'var_val'] = var_val
-                    df_combs_score.loc[curr_ind, 'res_rank'] = res_rank
-                    df_combs_score.loc[curr_ind, 'task_rank'] = task_rank
-                    df_combs_score.loc[curr_ind, 'prob'] = prob
-                    df_combs_score.loc[curr_ind, 'tot_score'] = a1*mean_val*+a2*var_val+a3*res_rank+a4*task_rank-a5*prob
-
-
-
-
-        unassigned_tasks_ = [task.task_type for task in unassigned_tasks]
-
-        dict_ranking_tasks = {}
-        for resource in available_resources:
-            dict_ranking_tasks[resource] = self.give_resource_ranking(self.df_mean_var, resource, set(unassigned_tasks_))
-
-        dict_ranking_resource = {}
-
-        for task in set(unassigned_tasks_):
-            dict_ranking_resource[task] = self.give_task_ranking(self.df_mean_var, available_resources, task)
-
-
-        df_sched_score = pd.DataFrame([])
-
-        for task in set(unassigned_tasks_):
-            for resource in available_resources:
-                if resource in resource_pool[task]:
-
-                    mean_val = -1
-                    var_val = -1
-                    if self.df_mean_var.shape[0] > 0:
-                        if 'mean_' + task in self.df_mean_var.columns:
-                            if self.df_mean_var.loc[self.df_mean_var['resource'] == resource, 'mean_' + task].shape[0] > 0:
-                                if self.df_mean_var.loc[
-                                    self.df_mean_var['resource'] == resource, 'mean_' + task].item() > 0:
-                                    mean_val = self.df_mean_var.loc[
-                                        self.df_mean_var['resource'] == resource, 'mean_' + task].item()
-                                    var_val = self.df_mean_var.loc[
-                                        self.df_mean_var['resource'] == resource, 'var_' + task].item()
-
-                    curr_df = dict_ranking_resource[task]
-                    res_rank = -1
-                    if not curr_df is None:
-                        if not (curr_df == None).all()[0]:
-                            if curr_df.loc[curr_df['resource'] == resource, 'Ranking'].shape[0] > 0:
-                                res_rank = curr_df.loc[curr_df['resource'] == resource, 'Ranking'].item()
-
-                    curr_df = dict_ranking_tasks[resource]
-                    task_rank = -1
-                    if not curr_df is None:
-                        if not (curr_df == None).all()[0]:
-                            if curr_df.loc[curr_df['task_name'] == task, 'Ranking'].shape[0]:
-                                task_rank = curr_df.loc[curr_df['task_name'] == task, 'Ranking'].item()
-
-
-
-                    if self.df_freq_transition.shape[0]:
-                        prob = self.get_task_out_prob(self.df_freq_transition, task)
-                        if not prob >= 0:
-                            prob = -1
-                    else:
-                        prob = -1
+                    prob = self.get_task_out_prob(self.df_freq_transition, task)
+                    # if self.df_freq_transition.shape[0]:
+                    #     prob = self.get_task_out_prob(self.df_freq_transition, task)
+                    #     if not prob >= 0:
+                    #         prob = -1
+                    # else:
+                    #     prob = -1
 
 
                     curr_ind = df_sched_score.shape[0]
@@ -251,118 +306,124 @@ class planner_Eliran:
                     df_sched_score.loc[curr_ind, 'res_rank'] = res_rank
                     df_sched_score.loc[curr_ind, 'task_rank'] = task_rank
                     df_sched_score.loc[curr_ind, 'prob'] = prob
-                    df_sched_score.loc[curr_ind, 'tot_score'] = a1*mean_val+a2*var_val+a3*res_rank+a4*task_rank+a5*prob
-
-        if (df_sched_score.shape[0] > 0 and curr_df_status > 2000):  # if there is at least one task resource combination in  df_sched_score
-            df_sched_score = df_sched_score.sort_values(by='tot_score').reset_index()
+                    df_sched_score.loc[curr_ind, 'tot_score'] = a1*mean_val+a2*var_val+a3*res_rank+a4*task_rank-a5*prob
 
 
-            while self.check_if_there_is_possible_match(available_resources, unassigned_tasks, resource_pool):
-                for ind in range(df_sched_score.shape[0]):
 
-                    task = df_sched_score.loc[ind, 'task']
-                    res = df_sched_score.loc[ind, 'resource']
-                    inds_tasks = [task_ind for task_ind in range(len(unassigned_tasks)) if (unassigned_tasks[task_ind].task_type==task)]
-                    if len(inds_tasks) > 0:
-                        if res in available_resources:
-                            if res in resource_pool[task]:
-                                assignments.append((unassigned_tasks[inds_tasks[0]], res))
+        # if (df_sched_score.shape[0] > 0 and curr_df_status > 2000):  # if there is at least one task resource combination in  df_sched_score
+        #     df_sched_score = df_sched_score.sort_values(by='tot_score').reset_index()
 
-                                available_resources.remove(res)
-                                unassigned_tasks.pop(inds_tasks[0])
 
-                                break
 
-        else:
+            # while self.check_if_there_is_possible_match(available_resources, unassigned_tasks, resource_pool):
+            for ind in range(df_sched_score.shape[0]):
+                temp_df = df_sched_score.sort_values(by='tot_score').reset_index()
+                task = temp_df.loc[ind, 'task']
+                res = temp_df.loc[ind, 'resource']
+                inds_tasks = [task_ind for task_ind in range(len(unassigned_tasks)) if (unassigned_tasks[task_ind].task_type==task)]
+                if len(inds_tasks) > 0:
+                    if res in available_resources:
+                        if res in resource_pool[task]:
+                            assignments.append((unassigned_tasks[inds_tasks[0]], res))
 
-            for task in unassigned_tasks:
-                for resource in available_resources:
-                    if resource in resource_pool[task.task_type]:
+                            available_resources.remove(res)
+                            unassigned_tasks.pop(inds_tasks[0])
 
-                        available_resources.remove(resource)
-                        assignments.append((task, resource))
-                        break
+                            break
+
+        # else:
+        #
+        #     for task in unassigned_tasks:
+        #         for resource in available_resources:
+        #             if resource in resource_pool[task.task_type]:
+        #
+        #                 available_resources.remove(resource)
+        #                 assignments.append((task, resource))
+        #                 break
 
         return assignments
 
 
     def report(self, event):
 
-
-        curr_ind = self.df.shape[0]
-        if curr_ind > 1000:
-            self.df = self.df.iloc[1:,:]
-            curr_ind = self.df.index[-1]+1
-
-        self.df.loc[curr_ind,'case_id'] = event.case_id
-        self.df.loc[curr_ind, 'task'] = str(event.task)
-        self.df.loc[curr_ind, 'timestamp'] = event.timestamp
-        self.df.loc[curr_ind, 'date_time'] = str(event).split('\t')[2]
-        self.df.loc[curr_ind, 'resource'] = event.resource
-        self.df.loc[curr_ind, 'lifecycle_state'] = str(event.lifecycle_state)
+        if True:
+            pass
 
 
-        # if a new task is activated or a case is completed
-        if str(event.lifecycle_state) == 'EventType.TASK_ACTIVATE' or str(event.lifecycle_state) == 'EventType.COMPLETE_CASE':
-
-
-
-            if str(event.lifecycle_state) == 'EventType.TASK_ACTIVATE':
-                prev_lifecycle = self.df.loc[self.df.index[-2],'lifecycle_state']
-                if prev_lifecycle == 'EventType.COMPLETE_TASK':
-                    prev_task = self.df.loc[self.df.index[-2], 'task']
-                    curr_task = self.df.loc[self.df.index[-1], 'task']
-                    self.df_freq_transition.loc[self.df_freq_transition['task']==prev_task,curr_task] = self.df_freq_transition.loc[self.df_freq_transition['task']==prev_task,curr_task].item() + 1
-
-
-            elif str(event.lifecycle_state) == 'EventType.COMPLETE_CASE':
-                if self.df.shape[0]>1:
-                    prev_task = self.df.loc[self.df.index[-2], 'task']
-                    self.df_freq_transition.loc[self.df_freq_transition['task']==prev_task,'complete_case'] = self.df_freq_transition.loc[self.df_freq_transition['task']==prev_task,'complete_case'].item() + 1
-
-
-
-        if str(event.lifecycle_state) == 'EventType.COMPLETE_TASK': # if a task just completed
-            resource = event.resource  # Give the current resource type
-            task = str(event.task)  # Give the current task type
-            # The index of the task start time event
-            start_ind = self.df.loc[(self.df['task'] == task) & (self.df['lifecycle_state'] == 'EventType.START_TASK'), :].index[-1]
-            # Computing the service time
-            ser_time = event.timestamp- self.df.loc[start_ind,'timestamp']
-            curr_resources = self.df_mean_var['resource'].unique() # All possible resources that were
-            if resource in curr_resources:  # if the current resource already been added in the past
-                get_ind = self.df_mean_var.loc[self.df_mean_var['resource']==resource,:].index[0] # if so, find its row
-            else:
-                get_ind = self.df_mean_var.shape[0]
-                self.df_mean_var.loc[get_ind, 'resource'] = resource
-
-            if 'count_' + task in  self.df_mean_var.columns:  # if this column exists
-                get_count_value = self.df_mean_var.loc[get_ind, 'count_' + task]  # get the count so far
-            else:
-                get_count_value = 0
-            if get_count_value > 0:  # if the count already took place
-                get_mean_value = self.df_mean_var.loc[get_ind, 'mean_' + task]  # get the mean service time so far
-                get_var_value = self.df_mean_var.loc[get_ind, 'var_' + task]  # get the service variance so far
-                curr_mean = (get_count_value*get_mean_value+ser_time)/(get_count_value+1) # compute the new service mean
-                if get_count_value > 1:  # For computing variance we need two values at least
-                    squer_sum = get_var_value*(get_count_value-1)+get_count_value*get_mean_value**2 # updating variance
-                    get_count_value += 1  # updating count
-                    curr_var = (squer_sum+ser_time**2-get_count_value*curr_mean**2)/(get_count_value-1) # updating variance
-
-                else:  # if this is the second time we get this combination (task, resource)
-                    # the variace is updated accordingly
-                    get_count_value = 2 # the count must be 2
-                    curr_var = (get_mean_value-curr_mean)**2+(ser_time-curr_mean)**2 # by defintion
-            else:
-                get_count_value = 1
-                curr_mean = ser_time
-                curr_var = 0  # it is not really zero but not defined yet.
-
-
-            # Updating df_mean_var table
-            self.df_mean_var.loc[get_ind, 'mean_' + task] = curr_mean
-            self.df_mean_var.loc[get_ind, 'var_' + task] = curr_var
-            self.df_mean_var.loc[get_ind, 'count_' + task] = get_count_value
+        # curr_ind = self.df.shape[0]
+        # if curr_ind > 1000:
+        #     self.df = self.df.iloc[1:,:]
+        #     curr_ind = self.df.index[-1]+1
+        #
+        # self.df.loc[curr_ind,'case_id'] = event.case_id
+        # self.df.loc[curr_ind, 'task'] = str(event.task)
+        # self.df.loc[curr_ind, 'timestamp'] = event.timestamp
+        # self.df.loc[curr_ind, 'date_time'] = str(event).split('\t')[2]
+        # self.df.loc[curr_ind, 'resource'] = event.resource
+        # self.df.loc[curr_ind, 'lifecycle_state'] = str(event.lifecycle_state)
+        #
+        #
+        # # if a new task is activated or a case is completed
+        # if str(event.lifecycle_state) == 'EventType.TASK_ACTIVATE' or str(event.lifecycle_state) == 'EventType.COMPLETE_CASE':
+        #
+        #
+        #
+        #     if str(event.lifecycle_state) == 'EventType.TASK_ACTIVATE':
+        #         prev_lifecycle = self.df.loc[self.df.index[-2],'lifecycle_state']
+        #         if prev_lifecycle == 'EventType.COMPLETE_TASK':
+        #             prev_task = self.df.loc[self.df.index[-2], 'task']
+        #             curr_task = self.df.loc[self.df.index[-1], 'task']
+        #             self.df_freq_transition.loc[self.df_freq_transition['task']==prev_task,curr_task] = self.df_freq_transition.loc[self.df_freq_transition['task']==prev_task,curr_task].item() + 1
+        #
+        #
+        #     elif str(event.lifecycle_state) == 'EventType.COMPLETE_CASE':
+        #         if self.df.shape[0]>1:
+        #             prev_task = self.df.loc[self.df.index[-2], 'task']
+        #             self.df_freq_transition.loc[self.df_freq_transition['task']==prev_task,'complete_case'] = self.df_freq_transition.loc[self.df_freq_transition['task']==prev_task,'complete_case'].item() + 1
+        #
+        #
+        #
+        # if str(event.lifecycle_state) == 'EventType.COMPLETE_TASK': # if a task just completed
+        #     resource = event.resource  # Give the current resource type
+        #     task = str(event.task)  # Give the current task type
+        #     # The index of the task start time event
+        #     start_ind = self.df.loc[(self.df['task'] == task) & (self.df['lifecycle_state'] == 'EventType.START_TASK'), :].index[-1]
+        #     # Computing the service time
+        #     ser_time = event.timestamp- self.df.loc[start_ind,'timestamp']
+        #     curr_resources = self.df_mean_var['resource'].unique() # All possible resources that were
+        #     if resource in curr_resources:  # if the current resource already been added in the past
+        #         get_ind = self.df_mean_var.loc[self.df_mean_var['resource']==resource,:].index[0] # if so, find its row
+        #     else:
+        #         get_ind = self.df_mean_var.shape[0]
+        #         self.df_mean_var.loc[get_ind, 'resource'] = resource
+        #
+        #     if 'count_' + task in  self.df_mean_var.columns:  # if this column exists
+        #         get_count_value = self.df_mean_var.loc[get_ind, 'count_' + task]  # get the count so far
+        #     else:
+        #         get_count_value = 0
+        #     if get_count_value > 0:  # if the count already took place
+        #         get_mean_value = self.df_mean_var.loc[get_ind, 'mean_' + task]  # get the mean service time so far
+        #         get_var_value = self.df_mean_var.loc[get_ind, 'var_' + task]  # get the service variance so far
+        #         curr_mean = (get_count_value*get_mean_value+ser_time)/(get_count_value+1) # compute the new service mean
+        #         if get_count_value > 1:  # For computing variance we need two values at least
+        #             squer_sum = get_var_value*(get_count_value-1)+get_count_value*get_mean_value**2 # updating variance
+        #             get_count_value += 1  # updating count
+        #             curr_var = (squer_sum+ser_time**2-get_count_value*curr_mean**2)/(get_count_value-1) # updating variance
+        #
+        #         else:  # if this is the second time we get this combination (task, resource)
+        #             # the variace is updated accordingly
+        #             get_count_value = 2 # the count must be 2
+        #             curr_var = (get_mean_value-curr_mean)**2+(ser_time-curr_mean)**2 # by defintion
+        #     else:
+        #         get_count_value = 1
+        #         curr_mean = ser_time
+        #         curr_var = 0  # it is not really zero but not defined yet.
+        #
+        #
+        #     # Updating df_mean_var table
+        #     self.df_mean_var.loc[get_ind, 'mean_' + task] = curr_mean
+        #     self.df_mean_var.loc[get_ind, 'var_' + task] = curr_var
+        #     self.df_mean_var.loc[get_ind, 'count_' + task] = get_count_value
 
 
 class Planner(ABC):
