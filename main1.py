@@ -27,7 +27,7 @@ def simulate_competition(a1,a2,a3,a4,a5):
 
     my_planner = planner_Eliran(a1, a2, a3, a4, a5)
 
-    mod_num = np.random.raindint(1, 10000000)
+    mod_num = np.random.randint(1, 10000000)
 
     results = []
     for i in range(15):
