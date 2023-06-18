@@ -29,7 +29,7 @@ def simulate_competition(a1,a2,a3,a4,a5):
 
     mod_num = np.random.randint(1, 10000000)
     results = []
-    for i in range(15):
+    for i in range(100):
         now = time.time()
         simulator = Simulator(planner = my_planner, instance_file="BPI Challenge 2017 - instance.pickle") # running_time = running_time,
         if type(my_planner) == PPOPlanner:
@@ -39,7 +39,7 @@ def simulate_competition(a1,a2,a3,a4,a5):
         result = simulator.run()[0]
         #print(f'Simulation finished in {time()-t1} seconds')
         print(result)
-        path_mod = str(mod_num)+'df_results5.pkl'
+        path_mod = str(mod_num)+'final_results.pkl'
         if os.path.exists(path_mod):
             df = pkl.load(open(path_mod, 'rb'))
         else:
@@ -82,9 +82,9 @@ def main():
 
 
 
-    A = [10.879914, 0.475911, 1.456346, 0.928605, 8.479268]
+    A = [16.40, 10.82, 11.17, 3.51, 15.84]
 
-    results = simulate_competition(10.531437856645526, 15.375280086388253, 7.264139715351323, 5.781553323925149, 19.416205458185715)
+    results = simulate_competition(16.40, 10.82, 11.17, 3.51, 15.84)
     pkl.dump(results, open('res.pkl', 'wb'))
 
 if __name__ == "__main__":

@@ -3,6 +3,6 @@
 #SBATCH -A def-dkrass
 #SBATCH --mem 10000
 source /home/eliransc/projects/def-dkrass/eliransc/queues/bin/activate
-python /home/eliransc/projects/def-dkrass/eliransc/bpo_eliran/bayes_opt.py
+python /home/eliransc/projects/def-dkrass/eliransc/bpo_eliran/main1.py
 
 
