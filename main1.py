@@ -29,7 +29,7 @@ def simulate_competition(a1,a2,a3,a4,a5):
 
 
     results = []
-    for i in range(20):
+    for i in range(15):
         now = time.time()
         simulator = Simulator(planner = my_planner, instance_file="BPI Challenge 2017 - instance.pickle") # running_time = running_time,
         if type(my_planner) == PPOPlanner:
