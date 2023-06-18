@@ -27,6 +27,7 @@ def simulate_competition(a1,a2,a3,a4,a5):
 
     my_planner = planner_Eliran(a1, a2, a3, a4, a5)
 
+    mod_num = np.random.raindint(1, 10000000)
 
     results = []
     for i in range(15):
@@ -39,8 +40,9 @@ def simulate_competition(a1,a2,a3,a4,a5):
         result = simulator.run()[0]
         #print(f'Simulation finished in {time()-t1} seconds')
         print(result)
-        if os.path.exists('df_results5.pkl'):
-            df = pkl.load(open('df_results5.pkl', 'rb'))
+        path_mod = str(mod_num)+'df_results5.pkl'
+        if os.path.exists(path_mod):
+            df = pkl.load(open(path_mod, 'rb'))
         else:
             df = pd.DataFrame([])
 
@@ -60,7 +62,8 @@ def simulate_competition(a1,a2,a3,a4,a5):
         df.loc[curr_ind, 'runtime'] = run_time
         df.loc[curr_ind, 'avg_cycle'] = result
 
-        pkl.dump(df, open('df_results5.pkl', 'wb'))
+
+        pkl.dump(df, open(path_mod, 'wb'))
         print(df)
     return  -np.array(results).mean()
 
