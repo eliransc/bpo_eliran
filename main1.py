@@ -61,9 +61,11 @@ def simulate_competition(a1,a2,a3,a4,a5):
         df.loc[curr_ind, 'runtime'] = run_time
         df.loc[curr_ind, 'avg_cycle'] = result
 
+        pkl.dump(i, open(str(mod_num), 'wb'))
 
-        pkl.dump(df, open(path_mod, 'wb'))
-        print(df)
+
+    pkl.dump(df, open(path_mod, 'wb'))
+    print(df)
     return  -np.array(results).mean()
 
 
